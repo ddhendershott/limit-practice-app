@@ -173,8 +173,8 @@ def check_answer(user_input, correct_a):
 @st.cache_data
 def get_plot_data(c):
     """
-    Generates data for the function curve.
-    Excludes the immediate vicinity of x = -1 to visualize the 'hole'.
+    Generates data for the function curve centered on the limit.
+    Uses a fixed window [-2, 0] to keep the focus on x = -1.
     """
     x_vals = np.linspace(-2, 0, 200)
     
@@ -337,8 +337,8 @@ if st.session_state.show_solution:
 
         # Layer 1: The continuous function line
         line = alt.Chart(df).mark_line(color='#00FFAA').encode(
-            x=alt.X('x', axis=alt.Axis(format='.2f')),
-            y=alt.Y('f(x)', axis=alt.Axis(format='.4f'), scale=alt.Scale(domain=[y_min, y_max])),
+            x=alt.X('x', axis=alt.Axis(format='.2f', title='x')),
+            y=alt.Y('f(x)', axis=alt.Axis(format='.4f', title='f(x)'), scale=alt.Scale(domain=[y_min, y_max])),
             tooltip=['x', 'f(x)']
         )
 
@@ -359,7 +359,8 @@ if st.session_state.show_solution:
             tooltip=[alt.Tooltip('f(x)', format='.4f', title="Limit Value (Undefined)")]
         )
 
-        final_chart = (line + point).properties(height=250).interactive()
+        # Combine charts (Interactive zoom disabled for pedagogical focus)
+        final_chart = (line + point).properties(height=250)
         st.altair_chart(final_chart, use_container_width=True)
 
 # --- 9. Footer / Reset ---
