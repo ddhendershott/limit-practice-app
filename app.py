@@ -29,11 +29,8 @@ st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
 
-    /* Global Typography */
-    html, body, [class*="css"] {
-        font-family: 'Inter', sans-serif;
-    }
-    .st-emotion-cache-1plm3a3 { display: none; } /* Hide default anchor links */
+    html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
+    .st-emotion-cache-1plm3a3 { display: none; } 
 
     /* Math Formula Display */
     .hero-math .katex {
@@ -43,10 +40,7 @@ st.markdown("""
     }
     
     /* Input Field Styling */
-    .stTextInput input {
-        text-align: center;
-        font-weight: 500;
-    }
+    .stTextInput input { text-align: center; font-weight: 500; }
     div[data-testid="InputInstructions"] { display: none; }
 
     /* Metrics & Dashboard Styling */
@@ -57,16 +51,8 @@ st.markdown("""
         padding: 10px;
         text-align: center;
     }
-    div[data-testid="stMetricLabel"] { 
-        color: var(--text-color); 
-        font-size: 0.8rem; 
-        opacity: 0.7;
-        justify-content: center; 
-    }
-    div[data-testid="stMetricValue"] { 
-        color: var(--text-color); 
-        font-size: 1.5rem; 
-    }
+    div[data-testid="stMetricLabel"] { opacity: 0.7; justify-content: center; }
+    div[data-testid="stMetricValue"] { font-size: 1.5rem; }
 
     /* Primary Button (Submit) */
     div[data-testid="stFormSubmitButton"] > button {
@@ -77,7 +63,6 @@ st.markdown("""
         width: 100%;
         padding: 0.6rem 1rem;
         font-size: 1.1rem;
-        transition: all 0.2s ease;
     }
     div[data-testid="stFormSubmitButton"] > button:hover {
         background-color: #00CC88 !important;
@@ -90,17 +75,13 @@ st.markdown("""
         color: var(--text-color) !important; 
         border: 2px solid rgba(128, 128, 128, 0.5) !important;
         border-radius: 8px;
-        font-size: 1rem;
         font-weight: 600;
-        padding: 0.5rem 1rem;
-        transition: all 0.2s ease;
     }
     div.stButton > button[kind="secondary"]:hover {
         border-color: #00FFAA !important;
         color: #00FFAA !important;
     }
     
-    /* Utility Classes */
     .limit-label {
         text-align: center;
         color: var(--text-color);
@@ -115,32 +96,25 @@ st.markdown("""
 # --- 3. Core Application Logic ---
 
 def encode_problem(a):
-    """Encodes the problem integer 'a' into a base64 string for URL sharing."""
+    """Encodes problem integer 'a' to base64."""
     return base64.b64encode(str(a).encode()).decode()
 
 def decode_problem(code):
-    """Decodes the base64 string back into the problem integer 'a'."""
+    """Decodes base64 string to integer 'a'."""
     try:
         return int(base64.b64decode(code.encode()).decode())
     except:
         return None
 
 def generate_problem():
-    """
-    Generates coefficients b and c such that the limit evaluates to 1/a.
-    Constraint: The expression must yield 0/0 at x = -1.
-    """
-    # Random integer 'a' leads to solution 1/a
+    """Generates coefficients b and c."""
     a = random.randint(2, 12)
-    
-    # Mathematical constraints for 0/0 form and integer simplification
     c = a**2 + 2
     b = c - 1
-    
     return {"a": a, "b": b, "c": c}
 
 def load_problem_from_url():
-    """Checks URL query parameters for a shared problem ID."""
+    """Checks URL query parameters for problem ID."""
     params = st.query_params
     if "problem_id" in params:
         a = decode_problem(params["problem_id"])
@@ -151,21 +125,18 @@ def load_problem_from_url():
     return None
 
 def check_answer(user_input, correct_a):
-    """
-    Validates user input using SymPy for symbolic equivalence.
-    Accepts fractions, decimals, and unsimplified expressions.
-    """
+    """Validates user input using SymPy."""
     try:
         if not user_input.strip():
             return False
         user_expr = sp.sympify(user_input)
         correct_sym = sp.Rational(1, correct_a)
         
-        # Check for symbolic equality first
+        # Check symbolic equality
         if sp.simplify(user_expr - correct_sym) == 0:
             return True
         
-        # Fallback to float comparison for edge cases
+        # Fallback to numerical check for floats
         return abs(float(user_expr) - float(correct_sym)) < 1e-4
     except (sp.SympifyError, ValueError, TypeError, AttributeError):
         return False
@@ -173,27 +144,99 @@ def check_answer(user_input, correct_a):
 @st.cache_data
 def get_plot_data(c):
     """
-    Generates data for the function curve centered on the limit.
-    Uses a fixed window [-2, 0] to keep the focus on x = -1.
+    Generates data for the function curve dynamically based on 'c'.
+    Includes a 'None' value at x=-1 to force a break in the line chart.
     """
-    x_vals = np.linspace(-2, 0, 200)
-    
-    # Filter out x values extremely close to -1 to prevent vertical asymptote artifacts
-    # and to visually prepare the gap for the hollow ring marker.
-    x_vals = x_vals[np.abs(x_vals + 1) > 0.05] 
-    
+    asymptote = 1 - c
+    x_start = asymptote + 0.05
+    x_end = 5 
+    x_vals = np.linspace(x_start, x_end, 2000)
+
+    # Create the visual gap
+    x_vals = x_vals[np.abs(x_vals + 1) > 0.08] 
     y_vals = np.sqrt(1 / (x_vals + c - 1))
-    return pd.DataFrame({'x': x_vals, 'f(x)': y_vals})
+    
+    df = pd.DataFrame({'x': x_vals, 'f(x)': y_vals})
+    gap_point = pd.DataFrame({'x': [-1], 'f(x)': [None]})
+    
+    df = pd.concat([df, gap_point], ignore_index=True).sort_values('x')
+    return df
+
+def create_solution_chart(df, prob):
+    """
+    Constructs the layered Altair chart. 
+    Extracted from main flow for better code organization.
+    """
+    actual_limit = 1 / prob['a']
+    asymptote_loc = 1 - prob['c']
+    
+    # 1. Dynamic Axis Scaling
+    x_min, x_max = df['x'].min(), df['x'].max()
+    x_padding = (x_max - x_min) * 0.05
+    x_domain = [x_min - x_padding, x_max]
+    
+    y_max = df['f(x)'].max() * 1.1
+    y_domain = [0, y_max]
+
+    shared_x = alt.Scale(domain=x_domain)
+    shared_y = alt.Scale(domain=y_domain)
+
+    # Layer 1: The Function Curve
+    line = alt.Chart(df).mark_line(color='#00FFAA', strokeWidth=3).encode(
+        x=alt.X('x', title='x', scale=shared_x),
+        y=alt.Y('f(x)', title='f(x)', scale=shared_y)
+    )
+
+    # Layer 2: The Asymptote Line
+    asymp_line = alt.Chart(pd.DataFrame({'x': [asymptote_loc]})).mark_rule(
+        strokeDash=[5, 5], color='#FF4B4B', opacity=0.8
+    ).encode(
+        x=alt.X('x', scale=shared_x),
+        tooltip=[alt.Tooltip('x', title="Vertical Asymptote")]
+    )
+
+    # Layer 3: Reference Axes
+    axis_x = alt.Chart(pd.DataFrame({'y': [0]})).mark_rule(color='gray', opacity=0.5).encode(
+        y=alt.Y('y', scale=shared_y)
+    )
+    axis_y = alt.Chart(pd.DataFrame({'x': [0]})).mark_rule(color='gray', opacity=0.5).encode(
+        x=alt.X('x', scale=shared_x)
+    )
+
+    # Layer 4: The Hole
+    hole_data = pd.DataFrame({'x': [-1], 'f(x)': [actual_limit]})
+    hole = alt.Chart(hole_data).mark_point(
+        shape='circle', size=150, filled=False, 
+        stroke='red', strokeWidth=2, opacity=1
+    ).encode(
+        x=alt.X('x', scale=shared_x),
+        y=alt.Y('f(x)', scale=shared_y),
+        tooltip=[alt.Tooltip('f(x)', format='.4f', title="Limit at x=-1")]
+    )
+
+    # Layer 5: Text Label
+    text_data = pd.DataFrame({'x': [-1], 'f(x)': [actual_limit], 'label': [f"Limit ≈ {actual_limit:.3f}"]})
+    text = alt.Chart(text_data).mark_text(
+        align='left', dx=15, dy=-15, color='white'
+    ).encode(
+        x=alt.X('x', scale=shared_x),
+        y=alt.Y('f(x)', scale=shared_y),
+        text='label'
+    )
+
+    return (asymp_line + axis_x + axis_y + line + hole + text).properties(
+        height=350,
+        title="Graph of f(x)"
+    )
 
 def reset_problem():
-    """Resets session state variables for a new problem."""
+    """Resets session state."""
     st.session_state.problem = generate_problem()
     st.session_state["user_input"] = ""
     st.session_state.problem_solved = False
     st.session_state.failed = False
     st.session_state.attempts = 0
     st.session_state.show_solution = False
-    # Clear URL params so refresh doesn't reload the old shared problem
     st.query_params.clear()
 
 # --- 4. Session State Initialization ---
@@ -205,7 +248,6 @@ if 'problem' not in st.session_state:
     else:
         st.session_state.problem = generate_problem()
 
-# Initialize tracking metrics
 for key, default in [('streak', 0), ('total_correct', 0), ('attempts', 0), 
                      ('problem_solved', False), ('failed', False), ('show_solution', False)]:
     if key not in st.session_state:
@@ -213,20 +255,18 @@ for key, default in [('streak', 0), ('total_correct', 0), ('attempts', 0),
 
 # --- 5. UI Layout ---
 
-# Title
 st.markdown("<h1 style='text-align: center;'>Limit Practice</h1>", unsafe_allow_html=True)
 st.write("") 
 
 # Metrics and Sharing Row
 sp_l, c1, c2, c3, sp_r = st.columns([2, 2, 2, 4, 2])
-
 with c1:
     streak_placeholder = st.empty()
 with c2:
     solved_placeholder = st.empty()
 with c3:
     st.write("") 
-    if st.button("🔗 Challenge a Friend", help="Generates a shareable URL for this specific problem"):
+    if st.button("🔗 Challenge a Friend", help="Generates a shareable URL"):
         prob = st.session_state.problem
         encoded_id = encode_problem(prob['a'])
         st.query_params["problem_id"] = encoded_id
@@ -255,18 +295,15 @@ with main_col:
 
 # --- 6. Feedback & Evaluation Logic ---
 if submit:
-    # [NEW] Guard Clause: Prevent penalty for empty submissions
     if not user_answer.strip():
         st.warning("⚠️ Please enter an answer before submitting.")
-        st.stop() # Halts execution here so they don't lose a life
+        st.stop()
 
     correct_a = prob['a']
     is_correct = check_answer(user_answer, correct_a)
 
     with main_col:
-        # Scenario 1: User is mathematically correct
         if is_correct:
-            # (Rest of logic remains exactly the same...)
             if st.session_state.failed:
                  st.warning(f"That matches the answer, but you have already used all attempts.")
             else:
@@ -280,9 +317,7 @@ if submit:
                 st.success(f"Correct! The limit is $\\frac{{1}}{{{correct_a}}}$.")
                 st.session_state.show_solution = True
 
-        # Scenario 2: User is incorrect
         else:
-            # (Rest of logic remains exactly the same...)
             if st.session_state.failed:
                  st.error(f"Answer: $\\frac{{1}}{{{correct_a}}}$.")
             elif st.session_state.problem_solved:
@@ -311,7 +346,6 @@ solved_placeholder.metric("Solved ✅", st.session_state.total_correct)
 # --- 8. Solution Breakdown & Visualization ---
 if st.session_state.show_solution:
     st.write("")
-    # Auto-expand solution if the user failed the problem
     should_auto_expand = st.session_state.failed
     
     with st.expander("📘 View Solution Breakdown", expanded=should_auto_expand):
@@ -327,37 +361,9 @@ if st.session_state.show_solution:
         st.divider()
         st.caption("Visual Proof (Removable Discontinuity at x = -1):")
         
-        # --- Altair Visualization ---
+        # --- Altair Visualization (Cleaned via helper function) ---
         df = get_plot_data(prob['c'])
-        y_min, y_max = min(df['f(x)'])-0.01, max(df['f(x)'])+0.01
-        actual_limit = 1 / prob['a']
-
-        # Layer 1: The continuous function line
-        line = alt.Chart(df).mark_line(color='#00FFAA').encode(
-            x=alt.X('x', axis=alt.Axis(format='.2f', title='x')),
-            y=alt.Y('f(x)', axis=alt.Axis(format='.4f', title='f(x)'), scale=alt.Scale(domain=[y_min, y_max])),
-            tooltip=['x', 'f(x)']
-        )
-
-        # Layer 2: The removable discontinuity (Hollow Ring)
-        # Represents that the function does not exist at exactly x = -1
-        point_data = pd.DataFrame({'x': [-1], 'f(x)': [actual_limit]})
-        
-        point = alt.Chart(point_data).mark_point(
-            shape='circle', 
-            size=100, 
-            filled=False, 
-            stroke='#00FFAA',
-            strokeWidth=2,
-            opacity=1
-        ).encode(
-            x='x', 
-            y='f(x)',
-            tooltip=[alt.Tooltip('f(x)', format='.4f', title="Limit Value (Undefined)")]
-        )
-
-        # Combine charts (Interactive zoom disabled for pedagogical focus)
-        final_chart = (line + point).properties(height=250)
+        final_chart = create_solution_chart(df, prob)
         st.altair_chart(final_chart, use_container_width=True)
 
 # --- 9. Footer / Reset ---
