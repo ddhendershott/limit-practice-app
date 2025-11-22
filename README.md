@@ -2,9 +2,10 @@
 
 A Streamlit application designed to help students practice evaluating limits involving square roots and rational expressions. Built for the CMU Technical Generalist exercise.
 
-🔗 **[Live Demo](<INSERT_YOUR_STREAMLIT_LINK_HERE>)**
+🔗 **[Live Demo](https://limit-practice-app.streamlit.app/)**
 
 ![App Screenshot](assets/screenshot.png) 
+
 ## 🎯 Project Overview
 This tool generates randomized limit problems where direct substitution results in $\frac{0}{0}$. It scaffolds the learning process by:
 1.  **Visualizing the Limit:** Using interactive charts to show the function approaching the limit despite the "hole" (removable discontinuity) at $x=-1$.
@@ -31,8 +32,8 @@ This ensures the denominator factors into $(x+1)(x + a^2)$, allowing the $(x+1)$
 
 1.  **Clone the repository:**
     ```bash
-    git clone <YOUR_GITHUB_REPO_URL>
-    cd <YOUR_REPO_NAME>
+    git clone [https://github.com/ddhendershott/limit-practice-app.git](https://github.com/ddhendershott/limit-practice-app.git)
+    cd limit-practice-app
     ```
 
 2.  **Install dependencies:**
