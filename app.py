@@ -1,3 +1,14 @@
+# -----------------------------------------------------------------------------
+# Limit Practice Application
+#
+# A Streamlit app designed to generate random limit problems involving square roots
+# and rational expressions. It features symbolic math validation, interactive
+# visualizations of removable discontinuities, and state management for tracking
+# user progress.
+#
+# Built for the Technical Generalist evaluation.
+# -----------------------------------------------------------------------------
+
 import streamlit as st
 import random
 import pandas as pd
@@ -6,39 +17,39 @@ import altair as alt
 import base64
 import sympy as sp
 
-# --- 1. Page Config ---
+# --- 1. Page Configuration ---
 st.set_page_config(
     page_title="Limit Practice",
     page_icon="∫",
     layout="centered"
 )
 
-# --- 2. CSS Styling ---
+# --- 2. Custom CSS Styling ---
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
 
-    /* Global Font */
+    /* Global Typography */
     html, body, [class*="css"] {
         font-family: 'Inter', sans-serif;
     }
-    .st-emotion-cache-1plm3a3 { display: none; } /* Hide anchor links */
+    .st-emotion-cache-1plm3a3 { display: none; } /* Hide default anchor links */
 
-    /* 1. HERO MATH - Theme Aware */
+    /* Math Formula Display */
     .hero-math .katex {
         font-size: 2.6em !important; 
         font-weight: 600;
         color: var(--text-color) !important;
     }
     
-    /* 2. INPUT FIELD - Native Mode */
+    /* Input Field Styling */
     .stTextInput input {
         text-align: center;
         font-weight: 500;
     }
     div[data-testid="InputInstructions"] { display: none; }
 
-    /* 3. METRICS & DASHBOARD - THEME FIXED */
+    /* Metrics & Dashboard Styling */
     div[data-testid="stMetric"] {
         background-color: var(--secondary-background-color);
         border: 1px solid rgba(128, 128, 128, 0.2);
@@ -57,9 +68,7 @@ st.markdown("""
         font-size: 1.5rem; 
     }
 
-    /* 4. BUTTONS */
-    
-    /* Primary (Submit) - GREEN */
+    /* Primary Button (Submit) */
     div[data-testid="stFormSubmitButton"] > button {
         background-color: #00FFAA !important;
         color: #000000 !important;
@@ -75,7 +84,7 @@ st.markdown("""
         box-shadow: 0 0 10px rgba(0, 255, 170, 0.4);
     }
 
-    /* Secondary (New Problem) - SOLID & VISIBLE */
+    /* Secondary Button (New Problem) */
     div.stButton > button[kind="secondary"] {
         background-color: var(--secondary-background-color) !important;
         color: var(--text-color) !important; 
@@ -91,7 +100,7 @@ st.markdown("""
         color: #00FFAA !important;
     }
     
-    /* 5. TEXT SIZING */
+    /* Utility Classes */
     .limit-label {
         text-align: center;
         color: var(--text-color);
@@ -103,26 +112,35 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# --- 3. Core Logic & Obfuscation ---
+# --- 3. Core Application Logic ---
 
 def encode_problem(a):
+    """Encodes the problem integer 'a' into a base64 string for URL sharing."""
     return base64.b64encode(str(a).encode()).decode()
 
 def decode_problem(code):
+    """Decodes the base64 string back into the problem integer 'a'."""
     try:
         return int(base64.b64decode(code.encode()).decode())
     except:
         return None
 
 def generate_problem():
+    """
+    Generates coefficients b and c such that the limit evaluates to 1/a.
+    Constraint: The expression must yield 0/0 at x = -1.
+    """
     # Random integer 'a' leads to solution 1/a
     a = random.randint(2, 12)
-    # Derive constants to ensure 0/0 and simplifiable result
+    
+    # Mathematical constraints for 0/0 form and integer simplification
     c = a**2 + 2
     b = c - 1
+    
     return {"a": a, "b": b, "c": c}
 
 def load_problem_from_url():
+    """Checks URL query parameters for a shared problem ID."""
     params = st.query_params
     if "problem_id" in params:
         a = decode_problem(params["problem_id"])
@@ -132,37 +150,53 @@ def load_problem_from_url():
             return {"a": a, "b": b, "c": c}
     return None
 
-# Robust SymPy Checking
 def check_answer(user_input, correct_a):
+    """
+    Validates user input using SymPy for symbolic equivalence.
+    Accepts fractions, decimals, and unsimplified expressions.
+    """
     try:
         if not user_input.strip():
             return False
         user_expr = sp.sympify(user_input)
         correct_sym = sp.Rational(1, correct_a)
+        
+        # Check for symbolic equality first
         if sp.simplify(user_expr - correct_sym) == 0:
             return True
+        
+        # Fallback to float comparison for edge cases
         return abs(float(user_expr) - float(correct_sym)) < 1e-4
     except (sp.SympifyError, ValueError, TypeError, AttributeError):
         return False
 
 @st.cache_data
 def get_plot_data(c):
+    """
+    Generates data for the function curve.
+    Excludes the immediate vicinity of x = -1 to visualize the 'hole'.
+    """
     x_vals = np.linspace(-2, 0, 200)
-    # Gap widened to 0.05 to ensure visual separation for the "hole" ring
+    
+    # Filter out x values extremely close to -1 to prevent vertical asymptote artifacts
+    # and to visually prepare the gap for the hollow ring marker.
     x_vals = x_vals[np.abs(x_vals + 1) > 0.05] 
+    
     y_vals = np.sqrt(1 / (x_vals + c - 1))
     return pd.DataFrame({'x': x_vals, 'f(x)': y_vals})
 
 def reset_problem():
+    """Resets session state variables for a new problem."""
     st.session_state.problem = generate_problem()
     st.session_state["user_input"] = ""
     st.session_state.problem_solved = False
     st.session_state.failed = False
     st.session_state.attempts = 0
     st.session_state.show_solution = False
+    # Clear URL params so refresh doesn't reload the old shared problem
     st.query_params.clear()
 
-# --- 4. Session Init ---
+# --- 4. Session State Initialization ---
 if 'problem' not in st.session_state:
     url_prob = load_problem_from_url()
     if url_prob:
@@ -171,18 +205,19 @@ if 'problem' not in st.session_state:
     else:
         st.session_state.problem = generate_problem()
 
+# Initialize tracking metrics
 for key, default in [('streak', 0), ('total_correct', 0), ('attempts', 0), 
                      ('problem_solved', False), ('failed', False), ('show_solution', False)]:
     if key not in st.session_state:
         st.session_state[key] = default
 
-# --- 5. Layout ---
+# --- 5. UI Layout ---
 
-# [CENTERED TITLE]
+# Title
 st.markdown("<h1 style='text-align: center;'>Limit Practice</h1>", unsafe_allow_html=True)
 st.write("") 
 
-# [CENTERED METRICS ROW]
+# Metrics and Sharing Row
 sp_l, c1, c2, c3, sp_r = st.columns([2, 2, 2, 4, 2])
 
 with c1:
@@ -191,7 +226,7 @@ with c2:
     solved_placeholder = st.empty()
 with c3:
     st.write("") 
-    if st.button("🔗 Challenge a Friend", help="Updates the URL to share this problem"):
+    if st.button("🔗 Challenge a Friend", help="Generates a shareable URL for this specific problem"):
         prob = st.session_state.problem
         encoded_id = encode_problem(prob['a'])
         st.query_params["problem_id"] = encoded_id
@@ -199,7 +234,7 @@ with c3:
 
 st.divider()
 
-# --- HERO MATH ---
+# Problem Display
 prob = st.session_state.problem
 numerator = "x + 1"
 denominator = f"x^2 + {prob['c']}x + {prob['b']}"
@@ -211,26 +246,26 @@ st.markdown('</div>', unsafe_allow_html=True)
 
 st.write("")
 
-# --- INPUT SECTION ---
+# Input Form
 spacer_l, main_col, spacer_r = st.columns([1, 2, 1])
 with main_col:
     with st.form(key='limit_form'):
         user_answer = st.text_input("Your Answer", key="user_input", placeholder="Enter answer...")
         submit = st.form_submit_button("Submit")
 
-# --- 6. Logic & Feedback ---
+# --- 6. Feedback & Evaluation Logic ---
 if submit:
     correct_a = prob['a']
     is_correct = check_answer(user_answer, correct_a)
 
     with main_col:
-        # CASE 1: The user typed the mathematically correct answer
+        # Scenario 1: User is mathematically correct
         if is_correct:
-            # Logic Fix: If they already failed, do NOT give them the "Correct!" win state.
+            # If the user has already failed this problem, acknowledge accuracy but preserve failure state
             if st.session_state.failed:
                  st.warning(f"That matches the answer, but you have already used all attempts.")
             
-            # Logic: First time correct, or re-submitting a solved problem
+            # Successful solve
             else:
                 if not st.session_state.problem_solved:
                     st.session_state.streak += 1
@@ -242,15 +277,17 @@ if submit:
                 st.success(f"Correct! The limit is $\\frac{{1}}{{{correct_a}}}$.")
                 st.session_state.show_solution = True
 
-        # CASE 2: The user typed the wrong answer
+        # Scenario 2: User is incorrect
         else:
-            # Sub-case: They already failed, just guessing again
+            # If already failed, simply show correct answer again
             if st.session_state.failed:
                  st.error(f"Answer: $\\frac{{1}}{{{correct_a}}}$.")
-            # Sub-case: They already solved it, but are now typing nonsense
+            
+            # If already solved, gently remind them they finished this one
             elif st.session_state.problem_solved:
                  st.success(f"Correct! The limit is $\\frac{{1}}{{{correct_a}}}$. (You solved this earlier)")
-            # Sub-case: Genuine attempt (count down tries)
+            
+            # Genuine attempt - process retry logic
             else:
                 st.session_state.streak = 0
                 st.session_state.attempts += 1
@@ -258,24 +295,26 @@ if submit:
                 
                 if attempts_left > 0:
                     st.warning(f"Not quite. {attempts_left} attempts left.")
-                    # Scaffolded Hints
+                    # Provide adaptive hints based on remaining attempts
                     if attempts_left == 2:
                         st.info("💡 **Hint 1 (Strategy):** Direct substitution gives $0/0$. This indicates a removable discontinuity. Try factoring.")
                     elif attempts_left == 1:
                         st.info(f"💡 **Hint 2 (Algebra):** Since the numerator is $(x+1)$, look for an $(x+1)$ factor in $x^2 + {prob['c']}x + {prob['b']}$.")
                 else:
+                    # Attempts exhausted
                     st.error(f"Answer: $\\frac{{1}}{{{correct_a}}}$.")
                     st.session_state.problem_solved = True
                     st.session_state.failed = True 
                     st.session_state.show_solution = True
 
-# --- 7. Update Metrics ---
+# --- 7. Metrics Update ---
 streak_placeholder.metric("Streak 🔥", st.session_state.streak)
 solved_placeholder.metric("Solved ✅", st.session_state.total_correct)
 
-# --- 8. Solution & Graph ---
+# --- 8. Solution Breakdown & Visualization ---
 if st.session_state.show_solution:
     st.write("")
+    # Auto-expand solution if the user failed the problem
     should_auto_expand = st.session_state.failed
     
     with st.expander("📘 View Solution Breakdown", expanded=should_auto_expand):
@@ -291,21 +330,22 @@ if st.session_state.show_solution:
         st.divider()
         st.caption("Visual Proof (Removable Discontinuity at x = -1):")
         
-        # Layered Altair Chart
+        # --- Altair Visualization ---
         df = get_plot_data(prob['c'])
         y_min, y_max = min(df['f(x)'])-0.01, max(df['f(x)'])+0.01
         actual_limit = 1 / prob['a']
 
-        # Chart Logic: Continuous line with a "hole"
+        # Layer 1: The continuous function line
         line = alt.Chart(df).mark_line(color='#00FFAA').encode(
             x=alt.X('x', axis=alt.Axis(format='.2f')),
             y=alt.Y('f(x)', axis=alt.Axis(format='.4f'), scale=alt.Scale(domain=[y_min, y_max])),
             tooltip=['x', 'f(x)']
         )
 
+        # Layer 2: The removable discontinuity (Hollow Ring)
+        # Represents that the function does not exist at exactly x = -1
         point_data = pd.DataFrame({'x': [-1], 'f(x)': [actual_limit]})
         
-        # Updated "Hole" visual: Hollow ring matching line color
         point = alt.Chart(point_data).mark_point(
             shape='circle', 
             size=100, 
@@ -322,7 +362,7 @@ if st.session_state.show_solution:
         final_chart = (line + point).properties(height=250).interactive()
         st.altair_chart(final_chart, use_container_width=True)
 
-# --- 9. Footer ---
+# --- 9. Footer / Reset ---
 st.write("")
 st.write("")
 c1, c2, c3 = st.columns([1, 2, 1])
