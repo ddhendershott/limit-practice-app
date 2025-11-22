@@ -255,17 +255,20 @@ with main_col:
 
 # --- 6. Feedback & Evaluation Logic ---
 if submit:
+    # [NEW] Guard Clause: Prevent penalty for empty submissions
+    if not user_answer.strip():
+        st.warning("⚠️ Please enter an answer before submitting.")
+        st.stop() # Halts execution here so they don't lose a life
+
     correct_a = prob['a']
     is_correct = check_answer(user_answer, correct_a)
 
     with main_col:
         # Scenario 1: User is mathematically correct
         if is_correct:
-            # If the user has already failed this problem, acknowledge accuracy but preserve failure state
+            # (Rest of logic remains exactly the same...)
             if st.session_state.failed:
                  st.warning(f"That matches the answer, but you have already used all attempts.")
-            
-            # Successful solve
             else:
                 if not st.session_state.problem_solved:
                     st.session_state.streak += 1
@@ -279,15 +282,11 @@ if submit:
 
         # Scenario 2: User is incorrect
         else:
-            # If already failed, simply show correct answer again
+            # (Rest of logic remains exactly the same...)
             if st.session_state.failed:
                  st.error(f"Answer: $\\frac{{1}}{{{correct_a}}}$.")
-            
-            # If already solved, gently remind them they finished this one
             elif st.session_state.problem_solved:
                  st.success(f"Correct! The limit is $\\frac{{1}}{{{correct_a}}}$. (You solved this earlier)")
-            
-            # Genuine attempt - process retry logic
             else:
                 st.session_state.streak = 0
                 st.session_state.attempts += 1
@@ -295,13 +294,11 @@ if submit:
                 
                 if attempts_left > 0:
                     st.warning(f"Not quite. {attempts_left} attempts left.")
-                    # Provide adaptive hints based on remaining attempts
                     if attempts_left == 2:
                         st.info("💡 **Hint 1 (Strategy):** Direct substitution gives $0/0$. This indicates a removable discontinuity. Try factoring.")
                     elif attempts_left == 1:
                         st.info(f"💡 **Hint 2 (Algebra):** Since the numerator is $(x+1)$, look for an $(x+1)$ factor in $x^2 + {prob['c']}x + {prob['b']}$.")
                 else:
-                    # Attempts exhausted
                     st.error(f"Answer: $\\frac{{1}}{{{correct_a}}}$.")
                     st.session_state.problem_solved = True
                     st.session_state.failed = True 
